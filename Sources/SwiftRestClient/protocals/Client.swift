@@ -10,27 +10,38 @@ import Combine
 
 public protocol Client {}
 
-struct ClientPublisher: Publisher {
-    func receive<S>(subscriber: S) where S : Subscriber, Self.Failure == S.Failure, Self.Output == S.Input {
-        
-    }
+public struct requestConfig {
+    var timout: Double = 10.0
     
-    public typealias Output = (data: Data,responce: URLResponse)
-    
-    public typealias Failure = SwiftyRestClientError
+    public static var standard = requestConfig()
 }
 
 public extension Client {
     
+    func request<T: Decodable>(_ endpoint: EndPoint, of type: T.Type, with config: requestConfig = .standard)->Publishers.TryMap<Publishers.Future<(Data, URLResponse), SwiftyRestClientError>, T>{
+        request(endpoint, with: config).tryMap({ (data) in
+            return try JSONDecoder().decode(T.self, from: data.0)
+        })
+    }
     
     
-    func request(_ endpoint: EndPoint, with timeout: TimeInterval = 10.0)->ClientPublisher  guth{
+    func request(_ endpoint: EndPoint, with config: requestConfig = .standard)->Publishers.Future<(Data, URLResponse), SwiftyRestClientError>{
         
-        var request = URLRequest(url: endpoint.baseURL.appendingPathComponent(endpoint.path), timeoutInterval: timeout)
+        var request = URLRequest(url: endpoint.baseURL.appendingPathComponent(endpoint.path), timeoutInterval: config.timout)
         request.httpMethod = endpoint.httpMethod.rawValue
         
-        URLSession.shared.dataTask(with: request) { (data, responce, error) in
-            
+        return Publishers.Future { (s: @escaping (Result<(Data, URLResponse), SwiftyRestClientError>) -> Void) in
+            DispatchQueue.main.async(qos: .userInitiated) {
+                URLSession.shared.dataTask(with: request) { (data, response, error) in
+                    if let data = data, let response = response {
+                        s(.success((data, response)))
+                    }else if let error = error {
+                        s(.failure(.lostConnection))
+                    }else {
+                        s(.failure(.unknownError))
+                    }
+                }
+            }
         }
         
     }
