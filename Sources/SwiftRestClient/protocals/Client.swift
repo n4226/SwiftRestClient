@@ -22,12 +22,21 @@ public struct requestConfig {
 
 public extension Client {
     
-    func request<T: Decodable>(_ endpoint: EndPoint, of type: T.Type, with config: requestConfig = .standard)->URLSession.DataTaskPublisher{
-        return request(endpoint, with: config)//.decode(type: T.self, decoder: JSONDecoder())
+    func request<T: Decodable>(_ endpoint: EndPoint, of type: T.Type, with config: requestConfig = .standard)->some Publisher{
+        return requestRaw(endpoint, with: config).tryMap { (data) in
+            try JSONDecoder().decode(T.self, from: data.data)
+        }
     }
+//
+//    func request(_ endpoint: EndPoint, with config: requestConfig = .standard)->some Publisher{
+//        _request(endpoint, of: endpoint.object, with: config)
+//        return (requestRaw(endpoint, with: config) ).map({ (data) in
+//            try JSONDecoder().decode(endpoint.object.self, from: data.data)
+//        })
+//    }
     
     
-    func request(_ endpoint: EndPoint, with config: requestConfig = .standard)->URLSession.DataTaskPublisher{
+    func requestRaw(_ endpoint: EndPoint, with config: requestConfig = .standard)->URLSession.DataTaskPublisher{
         
         
         var request = URLRequest(url: endpoint.baseURL.appendingPathComponent(endpoint.path), timeoutInterval: config.timout)
