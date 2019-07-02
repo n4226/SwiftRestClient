@@ -10,6 +10,10 @@ import Combine
 
 public protocol Client {}
 
+public enum requestError: Error {
+    case unknown
+}
+
 public struct requestConfig {
     var timout: Double = 10.0
     
@@ -18,32 +22,60 @@ public struct requestConfig {
 
 public extension Client {
     
-    func request<T: Decodable>(_ endpoint: EndPoint, of type: T.Type, with config: requestConfig = .standard)->Publishers.TryMap<Publishers.Future<(Data, URLResponse), SwiftyRestClientError>, T>{
-        request(endpoint, with: config).tryMap({ (data) in
-            return try JSONDecoder().decode(T.self, from: data.0)
-        })
+    func request<T: Decodable>(_ endpoint: EndPoint, of type: T.Type, with config: requestConfig = .standard)->URLSession.DataTaskPublisher{
+        return request(endpoint, with: config)//.decode(type: T.self, decoder: JSONDecoder())
     }
     
     
-    func request(_ endpoint: EndPoint, with config: requestConfig = .standard)->Publishers.Future<(Data, URLResponse), SwiftyRestClientError>{
+    func request(_ endpoint: EndPoint, with config: requestConfig = .standard)->URLSession.DataTaskPublisher{
+        
         
         var request = URLRequest(url: endpoint.baseURL.appendingPathComponent(endpoint.path), timeoutInterval: config.timout)
-        request.httpMethod = endpoint.httpMethod.rawValue
+         request.httpMethod = endpoint.httpMethod.rawValue
         
-        return Publishers.Future { (s: @escaping (Result<(Data, URLResponse), SwiftyRestClientError>) -> Void) in
-            DispatchQueue.main.async(qos: .userInitiated) {
-                URLSession.shared.dataTask(with: request) { (data, response, error) in
-                    if let data = data, let response = response {
-                        s(.success((data, response)))
-                    }else if let error = error {
-                        s(.failure(.lostConnection))
-                    }else {
-                        s(.failure(.unknownError))
-                    }
-                }
+        do {
+        
+            switch endpoint.task {
+            case .request:
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            case .requestWith(let bodyParameters, let urlParameters):
+                
+                try configureParameters(bodyParameters: bodyParameters, urlParameters: urlParameters, request: &request)
+                
+            case .requestWithHeaders(let bodyParameters, let urlParameters, let additionalHeaders):
+                self.additionalHeaders(additionalHeaders, request: &request)
+                try configureParameters(bodyParameters: bodyParameters, urlParameters: urlParameters, request: &request)
             }
+            
+        } catch {
+            
         }
         
+        return URLSession.shared.dataTaskPublisher(for: request)
+    }
+    
+    fileprivate func configureParameters(bodyParameters: Parameters?, urlParameters: Parameters?, request: inout URLRequest) throws {
+        
+        do {
+            if let bodyParameters = bodyParameters {
+                try JSONParameterEncoder.encode(urlRequest: &request, with: bodyParameters)
+            }
+            if let urlParameters = urlParameters {
+                try URLParameterEncoder.encode(urlRequest: &request, with: urlParameters)
+            }
+        } catch {
+            throw error
+        }
+    }
+    
+    fileprivate func additionalHeaders(_ additionalHeaders: HTTPHeader?, request: inout URLRequest) {
+        guard let headers = additionalHeaders else {
+            return
+        }
+        
+        for (key, value) in headers {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
     }
     
 }
