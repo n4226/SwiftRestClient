@@ -22,10 +22,10 @@ public struct requestConfig {
 
 public extension Client {
     
-    func request<T: Decodable>(_ endpoint: EndPoint, of type: T.Type, with config: requestConfig = .standard)->some Publisher{
+    func request<T: Decodable>(_ endpoint: EndPoint, of type: T.Type, with config: requestConfig = .standard)->AnyPublisher<T,Error>{
         return requestRaw(endpoint, with: config).tryMap { (data) in
             try JSONDecoder().decode(T.self, from: data.data)
-        }
+        }.eraseToAnyPublisher()
     }
 //
 //    func request(_ endpoint: EndPoint, with config: requestConfig = .standard)->some Publisher{
