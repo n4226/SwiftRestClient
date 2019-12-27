@@ -39,7 +39,7 @@ public extension Client {
     func requestRaw(_ endpoint: EndPoint, with config: requestConfig = .standard)->URLSession.DataTaskPublisher{
         
         
-        var request = URLRequest(url: endpoint.baseURL.appendingPathComponent(endpoint.path), timeoutInterval: config.timout)
+        var request = URLRequest(url: endpoint.baseURL.appendingPathComponent(endpoint.path,isDirectory: false), timeoutInterval: config.timout)
          request.httpMethod = endpoint.httpMethod.rawValue
         
         do {
