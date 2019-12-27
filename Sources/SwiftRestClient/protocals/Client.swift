@@ -40,6 +40,7 @@ public extension Client {
         
         
         var request = URLRequest(url: URL(string: endpoint.baseURL.absoluteString + endpoint.path)!, timeoutInterval: config.timout)
+        
          request.httpMethod = endpoint.httpMethod.rawValue
         
         do {
