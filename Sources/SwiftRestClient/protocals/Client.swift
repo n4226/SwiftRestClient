@@ -30,7 +30,34 @@ public extension Client {
         }
     }
     
-    func requestRaw(_ endpoint: EndPoint, with config: requestConfig = .standard, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
+    func Raw(_ endpoint: EndPoint, with config: requestConfig = .standard)//, completion: @escaping (Data?, URLResponse?, Error?) -> Void)
+        ->URLRequest {
+            var request = URLRequest(url: URL(string: endpoint.baseURL.absoluteString + endpoint.path)!, timeoutInterval: config.timout)
+            
+             request.httpMethod = endpoint.httpMethod.rawValue
+            
+            do {
+            
+                switch endpoint.task {
+                case .request:
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                case .requestWith(let bodyParameters, let urlParameters):
+                    
+                    try configureParameters(bodyParameters: bodyParameters, urlParameters: urlParameters, request: &request)
+                    
+                case .requestWithHeaders(let bodyParameters, let urlParameters, let additionalHeaders):
+                    self.additionalHeaders(additionalHeaders, request: &request)
+                    try configureParameters(bodyParameters: bodyParameters, urlParameters: urlParameters, request: &request)
+                }
+                
+            } catch {
+                
+            }
+            return request
+    //        URLSession.shared.dataTask(with: request, completionHandler: completion)
+        }
+    
+    func requestRaw(_ endpoint: EndPoint, with config: requestConfig = .standard, completion: @escaping (Data?, URLResponse?, Error?) -> Void){
         var request = URLRequest(url: URL(string: endpoint.baseURL.absoluteString + endpoint.path)!, timeoutInterval: config.timout)
         
          request.httpMethod = endpoint.httpMethod.rawValue
@@ -52,7 +79,6 @@ public extension Client {
         } catch {
             
         }
-        
         URLSession.shared.dataTask(with: request, completionHandler: completion)
     }
     
